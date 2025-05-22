@@ -17,3 +17,6 @@ This project is a lightweight web interface for browsing and viewing curated ima
    ```bash
    git clone https://github.com/yourusername/your-repo.git
    cd your-repo
+
+## Preview
+https://jessemorley.github.io/Photography-Inspiration/
