@@ -5,6 +5,7 @@ let breadcrumbs = [];
 let latestRenderId = 0;
 let rootFolderData = [];
 
+
 const searchInput = document.getElementById('search');
 searchInput.addEventListener('input', () => {
   if (currentPath === ROOT_PATH) {
@@ -28,10 +29,6 @@ async function listFolder(path) {
 }
 
 async function getFullImage(path) {
-  const cacheKey = `full:${path}`;
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) return cached;
-
   const response = await fetch('https://api.dropboxapi.com/2/files/get_temporary_link', {
     method: 'POST',
     headers: {
@@ -42,58 +39,10 @@ async function getFullImage(path) {
   });
 
   const data = await response.json();
-  const imageResponse = await fetch(data.link);
-  const blob = await imageResponse.blob();
-  const reader = new FileReader();
-
-  return new Promise(resolve => {
-    reader.onloadend = () => {
-      const base64data = reader.result;
-      try {
-        localStorage.setItem(cacheKey, base64data);
-      } catch (e) {
-        console.warn('Cache full or unavailable', e);
-      }
-      resolve(base64data);
-    };
-    reader.readAsDataURL(blob);
-  });
+  return data.link;
 }
 
-async function getTinyThumb(path) {
-  const cacheKey = `thumb:${path}`;
-  const cached = localStorage.getItem(cacheKey);
-  if (cached) return cached;
 
-  const response = await fetch('https://content.dropboxapi.com/2/files/get_thumbnail_v2', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${ACCESS_TOKEN}`,
-      'Dropbox-API-Arg': JSON.stringify({
-        resource: { '.tag': 'path', path },
-        format: 'jpeg',
-        size: 'w64h64'
-      })
-    }
-  });
-
-  if (!response.ok) return '';
-  const blob = await response.blob();
-  const reader = new FileReader();
-
-  return new Promise(resolve => {
-    reader.onloadend = () => {
-      const base64data = reader.result;
-      try {
-        localStorage.setItem(cacheKey, base64data);
-      } catch (e) {
-        console.warn('Tiny thumb cache error', e);
-      }
-      resolve(base64data);
-    };
-    reader.readAsDataURL(blob);
-  });
-}
 
 async function renderGallery(path, filter = '') {
   const renderId = ++latestRenderId;
@@ -136,28 +85,26 @@ async function renderGallery(path, filter = '') {
     const card = document.createElement('div');
     card.className = 'card';
 
-    getTinyThumb(file.path_lower).then(tiny => {
-      getFullImage(file.path_lower).then(src => {
-        const holder = document.createElement('img');
-        holder.className = 'img-holder';
-        holder.style.filter = 'blur(20px)';
-        holder.style.width = '100%';
-        holder.style.height = '100%';
-        holder.style.objectFit = 'cover';
-        holder.src = tiny; // set blurred thumbnail
-        card.appendChild(holder);
+    getFullImage(file.path_lower).then(src => {
+      const holder = document.createElement('img');
+      holder.className = 'img-holder';
+      holder.style.filter = 'blur(20px)';
+      holder.style.width = '100%';
+      holder.style.height = '100%';
+      holder.style.objectFit = 'cover';
+      holder.src = src;
+      card.appendChild(holder);
 
-        const img = document.createElement('img');
-        img.src = src;
-        img.alt = file.name;
-        img.onload = () => {
-          card.replaceChild(img, holder);
-        };
-        img.className = 'loaded-image';
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.objectFit = 'cover';
-      });
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = file.name;
+      img.onload = () => {
+        card.replaceChild(img, holder);
+      };
+      img.className = 'loaded-image';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
     });
 
     gallery.appendChild(card);
@@ -181,32 +128,30 @@ async function renderRootFromCache(filter = '') {
 
     gallery.appendChild(card);
 
-    getTinyThumb(folder.thumbPath).then(tiny => {
-      getFullImage(folder.thumbPath).then(src => {
-        const holder = document.createElement('img');
-        holder.className = 'img-holder';
-        holder.style.filter = 'blur(20px)';
-        holder.style.width = '100%';
-        holder.style.height = '100%';
-        holder.style.objectFit = 'cover';
-        holder.src = tiny;
-        card.appendChild(holder);
+    getFullImage(folder.thumbPath).then(src => {
+      const holder = document.createElement('img');
+      holder.className = 'img-holder';
+      holder.style.filter = 'blur(20px)';
+      holder.style.width = '100%';
+      holder.style.height = '100%';
+      holder.style.objectFit = 'cover';
+      holder.src = src;
+      card.appendChild(holder);
 
-        const img = document.createElement('img');
-        img.src = src;
-        img.alt = folder.name;
-        img.onload = () => {
-          card.replaceChild(img, holder);
-          const overlay = document.createElement('div');
-          overlay.className = 'overlay';
-          overlay.textContent = folder.name;
-          card.appendChild(overlay);
-        };
-        img.className = 'loaded-image';
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.objectFit = 'cover';
-      });
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = folder.name;
+      img.onload = () => {
+        card.replaceChild(img, holder);
+        const overlay = document.createElement('div');
+        overlay.className = 'overlay';
+        overlay.textContent = folder.name;
+        card.appendChild(overlay);
+      };
+      img.className = 'loaded-image';
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
     });
   }
 }
@@ -220,16 +165,14 @@ async function initRoot() {
     thumbPath: null
   }));
 
-  renderRootFromCache();
-
   for (const folder of rootFolderData) {
     const contents = await listFolder(folder.path);
     const preview = contents.find(f => f['.tag'] === 'file' && f.name.match(/\.(jpg|jpeg|png)$/i));
     if (preview) {
       folder.thumbPath = preview.path_lower;
-      renderRootFromCache();
     }
   }
-}
 
+  renderRootFromCache();
+}
 initRoot();
